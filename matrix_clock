@@ -1,0 +1,99 @@
+global_time = 0
+
+def get_global_time():
+    global global_time
+    global_time += 1
+    return global_time
+
+def format_matrix_clock(matrix_clock):
+    """
+    Return a string representation of the matrix clock
+    in the form (a,b,c), (x,y,z), ...
+    """
+    rows = []
+    for row in matrix_clock:
+        rows.append("(" + ",".join(map(str, row)) + ")")
+    return ", ".join(rows)
+
+class Message:
+    def __init__(self, sender_id, receiver_id, matrix_clock, send_time, receipt_time=None):
+        self.sender_id = sender_id
+        self.receiver_id = receiver_id
+        # Deep copy of matrix
+        self.matrix_clock = [row.copy() for row in matrix_clock]
+        self.send_time = send_time
+        self.receipt_time = receipt_time
+
+    def __repr__(self):
+        return (f"Message(from user{self.sender_id+1} to user{self.receiver_id+1}, "
+                f"MC={format_matrix_clock(self.matrix_clock)}, "
+                f"send_time={self.send_time}, receipt_time={self.receipt_time})")
+
+class Process:
+    def __init__(self, process_id, total_processes):
+        self.id = process_id
+        self.total_processes = total_processes
+        self.matrix_clock = [[0]*total_processes for _ in range(total_processes)]
+
+    def increment_event(self):
+        # Increment own row/column in the matrix clock
+        self.matrix_clock[self.id][self.id] += 1
+        event_time = get_global_time()
+        print(f"\nuser{self.id+1} generated an event at global_time={event_time}")
+        print(f"Updated MC of user{self.id+1}: {format_matrix_clock(self.matrix_clock)}")
+
+    def send_message(self, receiver):
+        send_time = get_global_time()
+        message = Message(self.id, receiver.id, self.matrix_clock, send_time)
+        print(f"\nuser{self.id+1} sends message to user{receiver.id+1} at global_time={send_time}")
+        print(f"  Current MC of user{self.id+1} (attached to message): "
+              f"{format_matrix_clock(self.matrix_clock)}")
+        receiver.receive_message(message)
+
+    def receive_message(self, message):
+        # Pairwise max update of matrix clock
+        for i in range(self.total_processes):
+            for j in range(self.total_processes):
+                self.matrix_clock[i][j] = max(self.matrix_clock[i][j],
+                                              message.matrix_clock[i][j])
+        # Acknowledge receipt by incrementing own event
+        self.matrix_clock[self.id][self.id] += 1
+
+        receipt_time = get_global_time()
+        message.receipt_time = receipt_time
+        print(f"\nuser{self.id+1} received {message}")
+        print(f"  Updated MC of user{self.id+1}: {format_matrix_clock(self.matrix_clock)}")
+
+# --- Simulation Setup ---
+def simulate_matrix_clock():
+    global global_time
+    global_time = 0
+    num_processes = 3
+    processes = [Process(i, num_processes) for i in range(num_processes)]
+
+    print("=== Simulation Start ===")
+
+    # Below is an example sequence of events.
+    # Adjust or extend these to replicate the exact scenario in your screenshot.
+
+    # user2 (process1) generates an event
+    processes[1].increment_event()
+
+    # user1 (process0) generates an event
+    processes[0].increment_event()
+
+    # user2 sends a message to user3
+    processes[1].send_message(processes[2])
+
+    # user3 (process2) generates an event
+    processes[2].increment_event()
+
+    # user3 sends a message to user1
+    processes[2].send_message(processes[0])
+
+    print("\n=== Final Matrix Clocks ===")
+    for p in processes:
+        print(f"user{p.id+1}: {format_matrix_clock(p.matrix_clock)}")
+
+if __name__ == "__main__":
+    simulate_matrix_clock()
